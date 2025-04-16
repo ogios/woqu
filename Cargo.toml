@@ -1,0 +1,16 @@
+[package]
+name = "woqu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+colpetto = { version = "0.6.0", features = ["tokio"] }
+
+tokio = { version = "1.42.1", features = ["macros", "rt-multi-thread"] }
+alsa = "0.9.1"
+hound = "3.5.1"
+tokio-stream = "0.1.17"
+rustix = { version = "1.0.5", features = ["fs", "process"] }
+
+clap = { version = "4.5", features = ["derive"] }
+affinitypool = "0.3.1"
