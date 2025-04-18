@@ -1,7 +1,7 @@
 use clap::Parser;
 use key::watch_for_keys;
 use rustix::{path::Arg, process::geteuid};
-use sfx::{init_thread_pool, load_data, spawn_play};
+use sfx::{load_data, spawn_play};
 
 mod key;
 mod sfx;
@@ -25,8 +25,7 @@ async fn main() {
     }
 
     let cli = Cli::parse();
-    load_data(&cli.file);
-    init_thread_pool(cli.threads);
+    load_data(&cli.file, cli.vol_gain);
     watch_for_keys(spawn_play).await.unwrap();
 }
 
@@ -34,10 +33,6 @@ async fn main() {
 pub struct Cli {
     #[arg(short = 'f', long)]
     pub file: String,
-    // #[arg(short = 'i', long)]
-    // pub input_device: Option<String>,
-    // #[arg(short = 'o', long)]
-    // pub output_sink: Option<String>,
-    #[arg(short = 't', long)]
-    pub threads: Option<usize>,
+    #[arg(short = 'v', long)]
+    pub vol_gain: Option<f32>,
 }
