@@ -35,7 +35,7 @@ pub fn spawn_play() {
             return;
         };
 
-        let p = PCM::new("default", alsa::Direction::Playback, false).unwrap();
+        let p = PCM::new("pipewire", alsa::Direction::Playback, false).unwrap();
 
         let hwp = HwParams::any(&p).unwrap();
         hwp.set_channels(spec.channels as u32).unwrap();
