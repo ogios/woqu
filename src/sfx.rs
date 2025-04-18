@@ -29,27 +29,49 @@ fn get_data_ref() -> Option<&'static (hound::WavSpec, std::vec::Vec<i16>)> {
     unsafe { DATA.load(std::sync::atomic::Ordering::Relaxed).as_ref() }
 }
 
+static POOL: AtomicPtr<affinitypool::Threadpool> = AtomicPtr::new(std::ptr::null_mut());
+
+pub fn init_pool(threads_count: Option<usize>) {
+    let mut builder = affinitypool::Builder::new();
+    if let Some(threads_count) = threads_count {
+        builder = builder.worker_threads(threads_count);
+    } else {
+        builder = builder.thread_per_core(true);
+    }
+    POOL.store(
+        Box::into_raw(Box::new(builder.build())),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+fn get_pool() -> &'static affinitypool::Threadpool {
+    unsafe { POOL.load(std::sync::atomic::Ordering::Relaxed).as_ref() }.unwrap()
+}
+
 pub fn spawn_play() {
-    std::thread::spawn(|| {
+    tokio::spawn(get_pool().spawn(|| {
         let Some((spec, samples)) = get_data_ref() else {
             return;
         };
 
-        let p = PCM::new("pipewire", alsa::Direction::Playback, false).unwrap();
+        thread_local!(
+            #[allow(non_upper_case_globals)]
+            static pcm: PCM = PCM::new("pipewire", alsa::Direction::Playback, false).unwrap()
+        );
+        pcm.with(|p| {
+            let hwp = HwParams::any(p).unwrap();
+            hwp.set_channels(spec.channels as u32).unwrap();
+            hwp.set_rate(spec.sample_rate, alsa::ValueOr::Nearest)
+                .unwrap();
+            hwp.set_format(Format::s16()).unwrap();
+            hwp.set_access(Access::RWInterleaved).unwrap();
+            p.hw_params(&hwp).unwrap();
+            let io = p.io_i16().unwrap();
 
-        let hwp = HwParams::any(&p).unwrap();
-        hwp.set_channels(spec.channels as u32).unwrap();
-        hwp.set_rate(spec.sample_rate, alsa::ValueOr::Nearest)
-            .unwrap();
-        hwp.set_format(Format::s16()).unwrap();
-        hwp.set_access(Access::RWInterleaved).unwrap();
-        p.hw_params(&hwp).unwrap();
-        let io = p.io_i16().unwrap();
-
-        p.prepare().unwrap();
-        play_samples(&io, samples, spec.channels).unwrap();
-        p.drain().unwrap();
-    });
+            p.prepare().unwrap();
+            play_samples(&io, samples, spec.channels).unwrap();
+            p.drain().unwrap();
+        })
+    }));
 }
 
 fn play_samples(
