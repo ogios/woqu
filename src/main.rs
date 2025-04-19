@@ -32,10 +32,13 @@ fn main() {
         );
     }
 
-    let cli = Cli::parse();
+    println!("Press any key to play the sound");
 
+    let cli = Cli::parse();
     let sdl = sdl2::init().unwrap();
     let _audio = sdl.audio().unwrap();
+
+    println!("SDL initialized");
 
     std::thread::spawn(move || {
         let samples = {
@@ -58,6 +61,9 @@ fn main() {
         let sound = sdl2::mixer::Chunk::from_raw_buffer(samples.into_boxed_slice()).unwrap();
         let rt = tokio::runtime::LocalRuntime::new().unwrap();
         let channel = sdl2::mixer::Channel::all();
+
+        println!("Audio initialized");
+
         rt.block_on(async {
             let p = || {
                 let _ = channel.play(&sound, 0);
