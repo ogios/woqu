@@ -14,3 +14,5 @@ rustix = { version = "1.0.5", features = ["fs", "process"] }
 
 clap = { version = "4.5", features = ["derive"] }
 affinitypool = "0.3.1"
+
+sdl2 = { version = "0.37.0", default-features = false, features = ["mixer"] }

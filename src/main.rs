@@ -1,13 +1,21 @@
+use std::path::Path;
+
 use clap::Parser;
 use key::watch_for_keys;
 use rustix::{path::Arg, process::geteuid};
-use sfx::{init_pool, load_data, spawn_play};
+use sdl2::mixer::{AUDIO_S16LSB, DEFAULT_CHANNELS, InitFlag};
 
 mod key;
-mod sfx;
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
+#[derive(Debug, Parser)]
+pub struct Cli {
+    #[arg(short = 'f', long)]
+    pub file: String,
+    #[arg(short = 'v', long)]
+    pub vol_gain: Option<f32>,
+}
+
+fn main() {
     fn is_root() -> bool {
         geteuid().is_root()
     }
@@ -25,17 +33,61 @@ async fn main() {
     }
 
     let cli = Cli::parse();
-    load_data(&cli.file, cli.vol_gain);
-    init_pool(cli.threads);
-    watch_for_keys(spawn_play).await.unwrap();
+
+    let sdl = sdl2::init().unwrap();
+    let _audio = sdl.audio().unwrap();
+
+    std::thread::spawn(move || {
+        let samples = {
+            let (spec, mut samples) = load_wav_file(&cli.file);
+            // volume gain
+            if let Some(gain) = cli.vol_gain {
+                volumn_up_samples(&mut samples, gain);
+            }
+
+            let frequency = spec.sample_rate as i32;
+            let channels = spec.channels as i32;
+            let format = AUDIO_S16LSB; // signed 16 bit samples, in little-endian byte order
+            let chunk_size = 1_024;
+            sdl2::mixer::open_audio(frequency, format, channels, chunk_size).unwrap();
+
+            samples
+        };
+        let _mixer_context = sdl2::mixer::init(InitFlag::MP3 | InitFlag::OGG).unwrap();
+
+        let sound = sdl2::mixer::Chunk::from_raw_buffer(samples.into_boxed_slice()).unwrap();
+        let rt = tokio::runtime::LocalRuntime::new().unwrap();
+        let channel = sdl2::mixer::Channel::all();
+        rt.block_on(async {
+            let p = || {
+                let _ = channel.play(&sound, 0);
+            };
+            watch_for_keys(p).await.unwrap();
+        })
+    });
+
+    let mut event_pump = sdl.event_pump().unwrap();
+    loop {
+        for event in event_pump.wait_iter() {
+            if let sdl2::event::Event::Quit { .. } = event {
+                std::process::exit(0);
+            }
+        }
+    }
 }
 
-#[derive(Debug, Parser)]
-pub struct Cli {
-    #[arg(short = 'f', long)]
-    pub file: String,
-    #[arg(short = 'v', long)]
-    pub vol_gain: Option<f32>,
-    #[arg(short = 't', long)]
-    pub threads: Option<usize>,
+fn volumn_up_samples(samples: &mut [i16], gain: f32) {
+    for sample in samples.iter_mut() {
+        let v = (*sample as f32) * gain;
+        *sample = v.max(i16::MIN as f32).min(i16::MAX as f32).round() as i16;
+    }
+}
+
+fn load_wav_file<P: AsRef<Path>>(path: P) -> (hound::WavSpec, Vec<i16>) {
+    let mut reader = hound::WavReader::open(path).unwrap();
+    let spec = reader.spec();
+    // assume PCM 16bits
+    let samples_result: Result<Vec<i16>, _> = reader.samples::<i16>().collect();
+    let samples = samples_result.unwrap();
+    (spec, samples)
 }
