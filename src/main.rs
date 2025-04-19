@@ -3,7 +3,7 @@ use std::path::Path;
 use clap::Parser;
 use key::watch_for_keys;
 use rustix::{path::Arg, process::geteuid};
-use sdl2::mixer::{AUDIO_S16LSB, DEFAULT_CHANNELS, InitFlag};
+use sdl2::mixer::{AUDIO_S16LSB, InitFlag};
 
 mod key;
 
