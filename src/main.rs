@@ -73,11 +73,9 @@ fn main() {
     });
 
     let mut event_pump = sdl.event_pump().unwrap();
-    loop {
-        for event in event_pump.wait_iter() {
-            if let sdl2::event::Event::Quit { .. } = event {
-                std::process::exit(0);
-            }
+    for event in event_pump.wait_iter() {
+        if let sdl2::event::Event::Quit { .. } = event {
+            std::process::exit(0);
         }
     }
 }
