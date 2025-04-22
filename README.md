@@ -1,4 +1,4 @@
-achieved without a mixer, but multiple threads of alsa instance.
+With sdl2 mixer, and `libinput`.
 
 **makesure you are in `input` group or running with root privilege**
 ```
