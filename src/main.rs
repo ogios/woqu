@@ -13,6 +13,9 @@ pub struct Cli {
     pub file: String,
     #[arg(short = 'v', long)]
     pub vol_gain: Option<f32>,
+    /// how many audios to play at the same time, default 8.
+    #[arg(short = 'c', long)]
+    pub channels: Option<u32>,
 }
 
 fn main() {
@@ -51,7 +54,7 @@ fn main() {
             let frequency = spec.sample_rate as i32;
             let channels = spec.channels as i32;
             let format = AUDIO_S16LSB; // signed 16 bit samples, in little-endian byte order
-            let chunk_size = 1_024;
+            let chunk_size = 256;
             sdl2::mixer::open_audio(frequency, format, channels, chunk_size).unwrap();
 
             samples
@@ -61,6 +64,9 @@ fn main() {
         let sound = sdl2::mixer::Chunk::from_raw_buffer(samples.into_boxed_slice()).unwrap();
         let rt = tokio::runtime::LocalRuntime::new().unwrap();
         let channel = sdl2::mixer::Channel::all();
+        if let Some(channels) = cli.channels {
+            sdl2::mixer::allocate_channels(channels as i32);
+        }
 
         println!("Audio initialized");
 
