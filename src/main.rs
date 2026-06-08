@@ -9,8 +9,11 @@ mod key;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
-    #[arg(short = 'f', long)]
     pub file: String,
+    #[arg(short = 'm', long, default_value_t = false)]
+    pub mouse: bool,
+    #[arg(short = 'a', long, default_value_t = false)]
+    pub all: bool,
     #[arg(short = 'v', long)]
     pub vol_gain: Option<f32>,
     /// how many audios to play at the same time, default 8.
@@ -40,6 +43,8 @@ fn main() {
     let cli = Cli::parse();
     let sdl = sdl2::init().unwrap();
     let _audio = sdl.audio().unwrap();
+    let mouse = cli.mouse || cli.all;
+    let keyboard = !mouse || cli.all;
 
     println!("SDL initialized");
 
@@ -74,7 +79,7 @@ fn main() {
             let p = || {
                 let _ = channel.play(&sound, 0);
             };
-            watch_for_keys(p).await.unwrap();
+            watch_for_keys(p, keyboard, mouse).await.unwrap();
         })
     });
 
